@@ -188,4 +188,3 @@ public static class AuthEndpoints
 }
 
 public record LoginRequest(string Username, string Password);
-
