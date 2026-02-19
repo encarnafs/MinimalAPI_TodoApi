@@ -1,0 +1,74 @@
+﻿@TodoApi_HostAddress = https://localhost:7039
+###@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6ImFkbWluIiwibmJmIjoxNzcxMDA5MTA5LCJleHAiOjE3NzEwMTI3MDksImlhdCI6MTc3MTAwOTEwOSwiaXNzIjoiZG90bmV0LXVzZXItand0cyIsImF1ZCI6Imh0dHA6Ly9sb2NhbGhvc3Q6NTI1NyJ9.arI7cVMF8QAv0VfL8L5qWxUTtnxIseIzVE_ch4TnAJk
+
+### 1. Login y obtener token
+POST {{TodoApi_HostAddress}}/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "12345"
+}
+
+###
+
+
+POST {{TodoApi_HostAddress}}/todoitems
+//Authorization: Bearer {{token}}  Ya no lo necesita porqué no lo busca en el header, al usar cookies el cliente lo enviará en la cabecera Cookie
+Content-Type: application/json
+
+{
+  "name":"walk",
+  "isComplete":true,
+  "Secret":"password"
+}
+
+###
+GET {{TodoApi_HostAddress}}/todoitems
+//Authorization: Bearer {{token}}
+
+###
+
+GET {{TodoApi_HostAddress}}/todoitems/complete
+//Authorization: Bearer {{token}}
+###
+
+@id=0
+GET {{TodoApi_HostAddress}}/todoitems/1
+//Authorization: Bearer {{token}}
+###
+
+PUT {{TodoApi_HostAddress}}/todoitems/1
+//Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "id": 1,
+  "name": "feed",
+  "isComplete": false
+}
+
+###
+
+DELETE {{TodoApi_HostAddress}}/todoitems/1
+//Authorization: Bearer {{token}}
+
+
+
+###
+
+
+
+### 2. Probar Endpoint Protegido (Sustituye el token)
+GET {{TodoApi_HostAddress}}/todoitems
+//Authorization: Bearer {{token}}
+
+###
+
+POST {{TodoApi_HostAddress}}/logout
+
+###
+
+POST {{TodoApi_HostAddress}}/refresh
+
+###
