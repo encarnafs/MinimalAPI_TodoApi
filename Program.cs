@@ -2,10 +2,16 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
-using TodoApi;
+using TodoApi.Data;
+using TodoApi.Endpoints;
+using TodoApi.Middlewares;
 
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
+
 builder.Services.AddDbContext<TodoDb>(opt => opt.UseInMemoryDatabase("TodoList"));
 //Captura excepciones en Development relacionadas con la BD (como fallos en las migraciones de Entity Framework)
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
@@ -109,6 +115,9 @@ if (app.Environment.IsDevelopment())
     app.UseMigrationsEndPoint();
 }
 
+//Busca GlobalExceptionHandler
+app.UseExceptionHandler();
+app.UseStatusCodePages();
 
 app.UseCors("ProdPolicy");
 app.UseAuthentication();
@@ -124,3 +133,4 @@ app.RegisterTodoItemsEndpoints();
 
 app.Run();
 
+public partial class Program { } // Permite que WebApplicationFactory lo encuentre

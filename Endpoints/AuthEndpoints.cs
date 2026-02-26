@@ -3,7 +3,9 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-namespace TodoApi;
+using TodoApi.Data;
+using TodoApi.Models;
+namespace TodoApi.Endpoints;
 
 public static class AuthEndpoints
 {

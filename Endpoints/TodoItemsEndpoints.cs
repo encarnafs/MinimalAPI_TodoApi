@@ -1,6 +1,9 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
-namespace TodoApi;
+using TodoApi.Data;
+using TodoApi.DTOs;
+using TodoApi.Models;
+namespace TodoApi.Endpoints;
 
 public static class TodoItemsEndpoints
 {
