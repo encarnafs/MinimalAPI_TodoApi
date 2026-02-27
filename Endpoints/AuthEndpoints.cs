@@ -159,7 +159,7 @@ public static class AuthEndpoints
 
             // Esto le dice al navegador que borre la cookie inmediatamente
             context.Response.Cookies.Delete("X-Access-Token");
-            context.Response.Cookies.Delete("X-Refresh-Token"); // Añade esta línea
+            context.Response.Cookies.Delete("X-Refresh-Token"); 
             return Results.Ok(new { Message = "Sesión cerrada" });
         });
     }
