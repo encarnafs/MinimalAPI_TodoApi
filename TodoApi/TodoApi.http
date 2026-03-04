@@ -34,7 +34,7 @@ GET {{TodoApi_HostAddress}}/todoitems/complete
 ###
 
 @id=0
-GET {{TodoApi_HostAddress}}/todoitems/1
+GET {{TodoApi_HostAddress}}/todoitems/15
 //Authorization: Bearer {{token}}
 ###
 

@@ -10,7 +10,17 @@ using TodoApi.Middlewares;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
-builder.Services.AddProblemDetails();
+builder.Services.AddProblemDetails(options =>
+{
+    options.CustomizeProblemDetails = context =>
+    {
+        // Esto fuerza a que TODOS los ProblemDetails (4xx y 5xx) incluyan el TraceId. Por defecto, las excepciones ya lo llevan pero los errores NO
+        if (!context.ProblemDetails.Extensions.ContainsKey("traceId"))
+        {
+            context.ProblemDetails.Extensions["traceId"] = context.HttpContext.TraceIdentifier;
+        }
+    };
+});
 
 builder.Services.AddDbContext<TodoDb>(opt => opt.UseInMemoryDatabase("TodoList"));
 //Captura excepciones en Development relacionadas con la BD (como fallos en las migraciones de Entity Framework)
@@ -133,4 +143,4 @@ app.RegisterTodoItemsEndpoints();
 
 app.Run();
 
-public partial class Program { } // Permite que WebApplicationFactory lo encuentre
+public partial class Program { } // Permite que WebApplicationFactory (Testing) lo encuentre
