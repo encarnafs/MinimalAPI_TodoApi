@@ -1,7 +1,5 @@
 <h1 align="center" id="title">🚀Minimal API</h1>
 
-<p id="description">He implementado una API con ASP.NET Core que gestiona tareas de forma segura mediante <b>JWT</b> y <b>Cookies HttpOnly</b>. Al usar cookies con los <b>flags HttpOnly y Secure</b> protejo los tokens contra ataques <b>XSS</b>. Además aplico la política <b>SameSite=Strict</b> para mitigar <b>ataques CSRF</b> asegurando que el navegador solo envíe los tokens en peticiones originadas desde mi propio sitio. La estrategia de rotación utiliza un <b>Access Token</b> de corta duración (15 min) y un <b>Refresh Token</b> de larga duración (7 días). Si un acceso expira (401) el sistema permite obtener un nuevo Access Token sin que el usuario deba reautenticarse manteniendo la sesión fluida y segura.</p>
-
 ## 🚀 Características principales
 
 * Desarrollo de una API REST utilizando ASP.NET Core Minimal APIs.
@@ -16,6 +14,9 @@
 * Pruebas de integración automatizadas.
 * Pruebas manuales mediante archivos `.http`.
 * Uso de Inyección de Dependencias y separación de responsabilidades.
+
+  
+<p id="description">He implementado una API con ASP.NET Core que gestiona tareas de forma segura mediante <b>JWT</b> y <b>Cookies HttpOnly</b>. Al usar cookies con los <b>flags HttpOnly y Secure</b> protejo los tokens contra ataques <b>XSS</b>. Además aplico la política <b>SameSite=Strict</b> para mitigar <b>ataques CSRF</b> asegurando que el navegador solo envíe los tokens en peticiones originadas desde mi propio sitio. La estrategia de rotación utiliza un <b>Access Token</b> de corta duración (15 min) y un <b>Refresh Token</b> de larga duración (7 días). Si un acceso expira (401) el sistema permite obtener un nuevo Access Token sin que el usuario deba reautenticarse manteniendo la sesión fluida y segura.</p>
 
 
 <h2>🛠️ Instalación:</h2>
