@@ -26,7 +26,6 @@
 ```json
 {   
    "Jwt": {
-     "Key": "TU_CLAVE_SECRETA_SUPER_SEGURA_DE_32_CARACTERES",
      "ValidIssuer": "https://localhost:{PORTX}",
      "ValidAudience": [
             "https://localhost:{PORTX}",
