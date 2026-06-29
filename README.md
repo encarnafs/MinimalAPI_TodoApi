@@ -2,6 +2,22 @@
 
 <p id="description">He implementado una API con ASP.NET Core que gestiona tareas de forma segura mediante <b>JWT</b> y <b>Cookies HttpOnly</b>. Al usar cookies con los <b>flags HttpOnly y Secure</b> protejo los tokens contra ataques <b>XSS</b>. Además aplico la política <b>SameSite=Strict</b> para mitigar <b>ataques CSRF</b> asegurando que el navegador solo envíe los tokens en peticiones originadas desde mi propio sitio. La estrategia de rotación utiliza un <b>Access Token</b> de corta duración (15 min) y un <b>Refresh Token</b> de larga duración (7 días). Si un acceso expira (401) el sistema permite obtener un nuevo Access Token sin que el usuario deba reautenticarse manteniendo la sesión fluida y segura.</p>
 
+## 🚀 Características principales
+
+* Desarrollo de una API REST utilizando ASP.NET Core Minimal APIs.
+* Autenticación basada en JWT.
+* Gestión segura de tokens mediante Cookies HttpOnly.
+* Refresh Tokens y rotación de tokens.
+* Protección frente a ataques XSS y CSRF.
+* Autorización basada en Roles y Policies.
+* Middleware global para la gestión centralizada de excepciones.
+* Respuestas de error estandarizadas mediante ProblemDetails.
+* Configuración de CORS.
+* Pruebas de integración automatizadas.
+* Pruebas manuales mediante archivos `.http`.
+* Uso de Inyección de Dependencias y separación de responsabilidades.
+
+
 <h2>🛠️ Instalación:</h2>
 
 <p>1. Clave de Seguridad: Configura una cadena de texto larga y aleatoria en la variable de entorno Jwt__Key (o en tu appsettings.json). Esta clave se usará para firmar los tokens.</p>
@@ -48,3 +64,12 @@ Technologies used in the project:
 <h2>⚡ Pruebas / Testing:</h2>
   
 <p>He incluido un archivo TodoApi.http para que puedas probar los endpoints directamente desde Visual Studio o VS Code sin necesidad de Postman.</p>
+
+## Mejoras futuras
+- Incorporar persistencia con BBDD.
+- Logging estructurado con Serilog.
+- Dockerización.
+- Rate Limiting.
+- Pruebas unitarias
+- Versionado de API.
+
