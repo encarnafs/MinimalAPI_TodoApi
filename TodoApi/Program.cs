@@ -9,6 +9,7 @@ using TodoApi.Middlewares;
 
 var builder = WebApplication.CreateBuilder(args);
 
+
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails(options =>
 {
@@ -69,6 +70,11 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         // Leemos la configuración del appsettings.json
         var jwtSection = builder.Configuration.GetSection("Authentication:Schemes:Bearer");
 
+
+        // LOGS DE CONTROL
+        Console.WriteLine($"CLAVE USADA: {builder.Configuration["Jwt:Key"]?.Substring(0, 5)}...");
+        Console.WriteLine($"EMISOR ESPERADO: '{jwtSection["ValidIssuer"]}'");
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
             //El servidor verifica que el token fue emitido por él mismo (o por el servidor de confianza que definí en el JSON)
@@ -118,6 +124,9 @@ builder.Services.AddAuthorization(options =>
 });
 
 var app = builder.Build();
+
+var issuer = builder.Configuration["Authentication:Schemes:Bearer:ValidIssuer"];
+Console.WriteLine($"DEBUG: El emisor configurado es: {issuer}");
 
 //procesa las solicitudes para ejecutar operaciones de migración de base de datos directamente desde el navegador
 if (app.Environment.IsDevelopment())

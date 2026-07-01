@@ -1,14 +1,19 @@
 ﻿using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Mvc;
 
 namespace TodoApi.Middlewares
 {
     public class GlobalExceptionHandler : IExceptionHandler
     {
         private readonly ILogger<GlobalExceptionHandler> _logger;
+        private readonly IProblemDetailsService _problemDetailsService;
+        private readonly IHostEnvironment _environment;
 
-        public GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger)
+        public GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger, IProblemDetailsService problemDetailsService, IHostEnvironment environment)
         {
             _logger = logger;
+            _problemDetailsService = problemDetailsService;
+            _environment = environment;
         }
 
         public async ValueTask<bool> TryHandleAsync(
@@ -17,21 +22,34 @@ namespace TodoApi.Middlewares
             CancellationToken cancellationToken)
         {
             // Si llegó aquí, es porque algo NO se controló (un bug, red caída, etc.)
-            _logger.LogError(exception, "Error no controlado");
+            _logger.LogError(
+                exception,
+                "Error no controlado en {Method} {Path}",
+                httpContext.Request.Method,
+                httpContext.Request.Path);
 
             httpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
 
-            // Solo devolvemos los detalles si es desarrollo, por seguridad
-            var response = new
+            // Si es desarrollo, devulevo los detalles del error por seguridad.
+            // Si es producción, devuelvo un mensaje genérico para no dar pistas a un atacante.
+            var problemDetails = new ProblemDetails
             {
-                Status = 500,
+                Status = StatusCodes.Status500InternalServerError,
                 Title = "Server Error",
-                Detail = "Ocurrió un error inesperado en el servidor."
+                Detail = _environment.IsDevelopment()
+                    ? exception.Message
+                    : "Ocurrió un error inesperado en el servidor."
             };
 
-            await httpContext.Response.WriteAsJsonAsync(response, cancellationToken);
+            await _problemDetailsService.WriteAsync(new ProblemDetailsContext
+            {
+                HttpContext = httpContext,
+                ProblemDetails = problemDetails,
+                Exception = exception
+            });
 
-            return true; // Decimos que el error está manejado
+            // Error manejado, no se propaga más allá de este middleware
+            return true;
         }
     }
 }
