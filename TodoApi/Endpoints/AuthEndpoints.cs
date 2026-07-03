@@ -17,14 +17,14 @@ public static class AuthEndpoints
         {
             if (user.Username != "admin" || user.Password != "12345")
             {
-                return Results.Unauthorized();
+                return TypedResults.Unauthorized();
             }
 
             var secretKey = config["Jwt:Key"];
 
             if (string.IsNullOrEmpty(secretKey) || secretKey.Length < 32)
             {
-                return Results.Problem("La clave JWT no es válida o es demasiado corta");
+                return TypedResults.Problem("La clave JWT no es válida o es demasiado corta");
             }
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
@@ -79,7 +79,7 @@ public static class AuthEndpoints
                 Expires = DateTime.UtcNow.AddDays(7)
             });
 
-            return Results.Ok(new { Message = "Autenticación satisfactoria" });
+            return TypedResults.Ok(new { Message = "Autenticación satisfactoria" });
         });
 
 
@@ -88,13 +88,13 @@ public static class AuthEndpoints
         {
             // 1. Extraer el Refresh Token de la cookie
             var refreshTokenCookie = context.Request.Cookies["X-Refresh-Token"];
-            if (string.IsNullOrEmpty(refreshTokenCookie)) return Results.Unauthorized();
+            if (string.IsNullOrEmpty(refreshTokenCookie)) return TypedResults.Unauthorized();
 
             // 2. Buscarlo en la base de datos y verificar que no haya expirado
             var storedToken = await db.RefreshTokens
                 .FirstOrDefaultAsync(t => t.Token == refreshTokenCookie && t.ExpiryDate > DateTime.UtcNow);
 
-            if (storedToken == null) return Results.Unauthorized();
+            if (storedToken == null) return TypedResults.Unauthorized();
 
             // 3. --- ROTACIÓN: Seguridad en producción ---
             // Borramos el viejo para que no se pueda volver a usar
@@ -142,7 +142,7 @@ public static class AuthEndpoints
                 Expires = DateTime.UtcNow.AddDays(7)
             });
 
-            return Results.Ok(new { Message = "Token renovado con éxito" });
+            return TypedResults.Ok(new { Message = "Token renovado con éxito" });
         });
 
 
@@ -161,7 +161,7 @@ public static class AuthEndpoints
             // Esto le dice al navegador que borre la cookie inmediatamente
             context.Response.Cookies.Delete("X-Access-Token");
             context.Response.Cookies.Delete("X-Refresh-Token"); 
-            return Results.Ok(new { Message = "Sesión cerrada" });
+            return TypedResults.Ok(new { Message = "Sesión cerrada" });
         });
     }
     private static string GenerarJwtToken(string username, IConfiguration config)
