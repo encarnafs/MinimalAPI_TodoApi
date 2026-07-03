@@ -152,4 +152,6 @@ app.RegisterTodoItemsEndpoints();
 
 app.Run();
 
+// Solo sirve para que un proyecto de pruebas pueda encontrar la clase Program.
+// Se utiliza únicamente en tests de integración.
 public partial class Program { } // Permite que WebApplicationFactory (Testing) lo encuentre

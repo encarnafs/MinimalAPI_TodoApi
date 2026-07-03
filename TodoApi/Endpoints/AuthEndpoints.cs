@@ -4,6 +4,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using TodoApi.Data;
+using TodoApi.DTOs;
 using TodoApi.Models;
 namespace TodoApi.Endpoints;
 
@@ -12,7 +13,7 @@ public static class AuthEndpoints
     public static void MapAuthEndpoints(this IEndpointRouteBuilder app)
     {
         //ENDPOINT LOGIN
-        app.MapPost("/login", async (LoginRequest user, IConfiguration config, HttpContext context, TodoDb db) =>
+        app.MapPost("/login", async (LoginRequestDTO user, IConfiguration config, HttpContext context, TodoDb db) =>
         {
             if (user.Username != "admin" || user.Password != "12345")
             {
@@ -188,5 +189,3 @@ public static class AuthEndpoints
         return tokenHandler.WriteToken(token);
     }
 }
-
-public record LoginRequest(string Username, string Password);
