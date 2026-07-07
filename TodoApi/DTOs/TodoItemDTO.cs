@@ -9,6 +9,8 @@ namespace TodoApi.DTOs
         public bool IsComplete { get; set; }
 
         public TodoItemDTO() { }
+
+        // Constructor que inicializa un TodoItemDTO a partir de un objeto Todo
         public TodoItemDTO(Todo todoItem) =>
         (Id, Name, IsComplete) = (todoItem.Id, todoItem.Name, todoItem.IsComplete);
     }
