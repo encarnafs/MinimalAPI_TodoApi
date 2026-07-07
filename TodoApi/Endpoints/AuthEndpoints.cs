@@ -92,9 +92,7 @@ public static class AuthEndpoints
             await db.SaveChangesAsync();
 
             // 4. Generar el nuevo JWT (Access Token)
-            // Aquí puedes extraer tu lógica de generación de JWT a un método privado para no repetir código
             var nuevoStringToken = GenerarJwtToken(storedToken.Username, config);
-
 
             // 5. Guardar ambos tokens en cookies HttpOnly
             EscribirCookiesAutenticacion(context,nuevoStringToken,newRefreshToken.Token);
@@ -115,23 +113,30 @@ public static class AuthEndpoints
                 await db.SaveChangesAsync();
             }
 
-            // Esto le dice al navegador que borre la cookie inmediatamente
+            // 2. Esto le dice al navegador que borre la cookie inmediatamente
             context.Response.Cookies.Delete("X-Access-Token");
             context.Response.Cookies.Delete("X-Refresh-Token"); 
             return TypedResults.Ok(new { Message = "Sesión cerrada" });
         });
     }
+
+    // Método privado para generar JWT
     private static string GenerarJwtToken(string username, IConfiguration config)
     {
+        // 1. Obtener la clave secreta desde la configuración
         var secretKey = config["Jwt:Key"];
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey!));
+        
+        // 2. Crear las credenciales de firma usando HMAC SHA256
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
+        // 3. Crear los claims para el token
         var claims = new[] {
         new Claim(ClaimTypes.Name, username),
         new Claim(ClaimTypes.Role, "Admin")
-    };
+        };
 
+        // 4. Crear el descriptor del token con los claims, fecha de expiración, credenciales de firma, emisor y audiencia
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(claims),
@@ -141,15 +146,20 @@ public static class AuthEndpoints
             Audience = config["Authentication:Schemes:Bearer:ValidAudiences:0"]
         };
 
+        // 5. Crear el token JWT y devolverlo como string
         var tokenHandler = new JwtSecurityTokenHandler();
         var token = tokenHandler.CreateToken(tokenDescriptor);
         return tokenHandler.WriteToken(token);
     }
 
+
+    // Método privado para generar un Refresh Token
     private static UserRefreshToken GenerarRefreshToken(string username)
     {
+        // Generar un nuevo valor de Refresh Token usando un GUID
         var newRefreshTokenValue =  Guid.NewGuid().ToString();
 
+        // Crear un nuevo objeto UserRefreshToken con el nombre de usuario, el token generado y la fecha de expiración (7 días a partir de ahora)
         return new UserRefreshToken
         {
             Username = username,
@@ -158,11 +168,14 @@ public static class AuthEndpoints
         };
     }
 
+
+    // Método privado para escribir cookies de autenticación
     private static void EscribirCookiesAutenticacion(
     HttpContext context,
     string accessToken,
     string refreshToken)
     {
+        // Guardar ambos tokens en cookies HttpOnly
         context.Response.Cookies.Append("X-Access-Token", accessToken, new CookieOptions
         {
             HttpOnly = true,
