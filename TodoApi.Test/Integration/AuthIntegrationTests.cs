@@ -1,11 +1,12 @@
-﻿using Microsoft.AspNetCore.Mvc.Testing;
+﻿using FluentAssertions;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Http.Json;
 using TodoApi.Data;
+using TodoApi.DTOs;
 using TodoApi.Models;
-using FluentAssertions;
 
 namespace TodoApi.Test.Integration
 {
@@ -16,12 +17,18 @@ namespace TodoApi.Test.Integration
         public async Task Login_WithValidCredentials_ReturnsOk_AndSetsCookies()
         {
             // Arrange
-            var loginDto = new { Username = "admin", Password = "12345" };
-
+            var loginDto = new LoginRequestDTO
+            {
+                Username = "admin",
+                Password = "12345"
+            };
+            
             // Act
             var response = await Client.PostAsJsonAsync("/login", loginDto);
 
-            // --- Assert Clásico (XUnit) ---
+            // Assert
+
+            // --- Clásico (XUnit) ---
             // Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             // var hasCookies = response.Headers.Contains("Set-Cookie");
             // Assert.True(hasCookies, "La respuesta debería contener headers 'Set-Cookie'");
@@ -44,31 +51,40 @@ namespace TodoApi.Test.Integration
                 "debería recibir el token de refresco para renovar la sesión");
         }
 
+        // Verifica que la API no revela si el usuario existe.
+        // Tanto un usuario inexistente como una contraseña incorrecta
+        // deben devolver 401 Unauthorized.
         [Fact]
         public async Task Login_WithNonExistentUser_ReturnsUnauthorized()
         {
             // Arrange
-            var loginDto = new { Username = "non_existent_user", Password = "some_password" };
-
+            var loginDto = new LoginRequestDTO
+            {
+                Username = "non_existent_user",
+                Password = "some_password"
+            };
             // Act
             var response = await Client.PostAsJsonAsync("/login", loginDto);
 
-            // --- Assert Clásico (XUnit) ---
+            // Assert
+
+            // --- Clásico (XUnit) ---
             // Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
 
             // --- Fluent Assertions ---
             response.StatusCode.Should().Be(HttpStatusCode.Unauthorized,
-                "porque el sistema no debe permitir el acceso a usuarios que no están registrados");
-
-            // Verificación de seguridad: No deberíamos dar pistas de si el usuario existe o no
-            // (Ambos deberían devolver 401 en una API segura)
+                "porque la API no debe revelar si el usuario existe o si las credenciales son incorrectas");
         }
 
         [Fact]
         public async Task Login_WithInvalidCredentials_ReturnsUnauthorized()
         {
             // Arrange
-            var loginDto = new { Username = "admin", Password = "wrong_password" };
+            var loginDto = new LoginRequestDTO
+            {
+                Username = "admin",
+                Password = "wrong_password"
+            };
 
             // Act
             var response = await Client.PostAsJsonAsync("/login", loginDto);
@@ -77,47 +93,62 @@ namespace TodoApi.Test.Integration
             //Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
 
             // --- Fluent Assertions ---
-            // Verificamos que el status code sea 401 Unauthorized
+            // Verifico que el status code sea 401 Unauthorized
             response.StatusCode.Should().Be(HttpStatusCode.Unauthorized,
-                "porque se proporcionó una contraseña incorrecta");
+                "porque las credenciales proporcionadas no son válidas");
 
-            // Opcional: Verificamos que NO se hayan establecido cookies de sesión en un login fallido
+            // Opcional: Verifico que NO se hayan establecido cookies de sesión en un login fallido
             response.Headers.Contains("Set-Cookie").Should().BeFalse(
-                "no se deben emitir tokens de acceso si la autenticación falla");
+                "porque no se deben emitir cookies de autenticación cuando el inicio de sesión falla");
         }
 
         [Fact]
         public async Task Logout_ClearsCookies_And_RemovesRefreshTokenFromDb()
         {
+            // Arrange 
             // 1. LOGIN para obtener la cookie de Refresh Token
-            var loginResponse = await Client.PostAsJsonAsync("/login", new { Username = "admin", Password = "12345" });
+            var loginDto = new LoginRequestDTO
+            {
+                Username = "admin",
+                Password = "12345"
+            };
+
+            var loginResponse = await Client.PostAsJsonAsync("/login", loginDto);
 
             var setCookieHeader = loginResponse.Headers.Contains("Set-Cookie")
                 ? loginResponse.Headers.GetValues("Set-Cookie").FirstOrDefault(c => c.Contains("X-Refresh-Token"))
                 : null;
 
             var tokenValue = ExtractCookieValue(setCookieHeader, "X-Refresh-Token");
-            // --- Assert Clásico (XUnit) ---
+
+            // Assert: Verifico que el token de refresco se haya recibido correctamente
+
+            // --- Clásico (XUnit) ---
             // Assert.NotNull(tokenValue);
 
             // Fluent Assertions
             tokenValue.Should().NotBeNull("porque el login debe generar un Refresh Token para este test");
 
+            // Act
             // 2. LOGOUT
             var logoutResponse = await Client.PostAsync("/logout", null);
 
-            // --- Assert Clásico (XUnit) ---
+            // Assert: Verificamos que la respuesta del logout sea 200 OK
+
+            // --- Clásico (XUnit) ---
             // Assert.Equal(HttpStatusCode.OK, logoutResponse.StatusCode);
 
             // Fluent Assertions
-            logoutResponse.StatusCode.Should().Be(HttpStatusCode.OK, "el logout debería procesarse correctamente");
+            logoutResponse.StatusCode.Should().Be(HttpStatusCode.OK, "porque el cierre de sesión debe completarse correctamente");
 
             // 3. VERIFICACIÓN en Base de Datos
             using var scope = Factory.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<TodoDb>();
             var tokenExists = await db.RefreshTokens.AnyAsync(t => t.Token == tokenValue);
 
-            // --- Assert Clásico (XUnit) ---
+            // Assert: Verifico que el Refresh Token haya sido eliminado de la base de datos
+
+            // ---  Clásico (XUnit) ---
             // Assert.False(tokenExists, "El Refresh Token debería haber sido eliminado de la DB tras el logout");
 
             // Fluent Assertions
@@ -127,16 +158,26 @@ namespace TodoApi.Test.Integration
         [Fact]
         public async Task AfterLogout_CannotAccessProtectedEndpoints()
         {
+            // Arrange
             // 1. Login previo
-            await Client.PostAsJsonAsync("/login", new { Username = "admin", Password = "12345" });
+            var loginDto = new LoginRequestDTO
+            {
+                Username = "admin",
+                Password = "12345"
+            };
 
-            // 2. Logout
+            // 2. Realizo el login para obtener el Refresh Token
+            var loginResponse = await Client.PostAsJsonAsync("/login", loginDto);
+
+            // 3. Logout
             await Client.PostAsync("/logout", null);
 
-            // 3. Intentar acceder a un recurso que requiere auth (usa uno simple)
+            // Act
+            // 4. Intentar acceder a un recurso que requiere auth (uso uno simple)
             var protectedResponse = await Client.GetAsync("/todoitems");
 
-            // --- Assert Clásico (XUnit) ---
+            // Assert: Verifico que la respuesta sea 401 Unauthorized tras el logout
+            // --- Clásico (XUnit) ---
             // Assert.Equal(HttpStatusCode.Unauthorized, protectedResponse.StatusCode);
 
             // --- Fluent Assertions ---
@@ -147,15 +188,22 @@ namespace TodoApi.Test.Integration
         [Fact]
         public async Task RequestWithModifiedRefreshToken_ReturnsUnauthorized()
         {
+            // Arrange
             // 1. LOGIN inicial para obtener un token válido en la cookie y en la DB
-            var loginResponse = await Client.PostAsJsonAsync("/login", new { Username = "admin", Password = "12345" });
+            var loginDto = new LoginRequestDTO
+            {
+                Username = "admin",
+                Password = "12345"
+            };
+
+            var loginResponse = await Client.PostAsJsonAsync("/login", loginDto);
 
             var setCookieHeader = loginResponse.Headers.GetValues("Set-Cookie")
                 .FirstOrDefault(c => c.Contains("X-Refresh-Token"));
 
             var originalToken = ExtractCookieValue(setCookieHeader, "X-Refresh-Token");
 
-            // 2. MODIFICAR el token en la DB (Simulamos manipulación)
+            // 2. MODIFICAR el token en la DB (Simulo manipulación)
             await ExecuteInScopeAsync(async (db) =>
             {
                 var tokenRecord = await db.RefreshTokens.FirstOrDefaultAsync(t => t.Token == originalToken);
@@ -167,10 +215,14 @@ namespace TodoApi.Test.Integration
                 await db.SaveChangesAsync();
             });
 
+            // Act
+
             // 3. ACT: Intentar refrescar con la cookie original (que ya no coincide con la DB)
             var refreshResponse = await Client.PostAsync("/refresh", null);
 
-            // --- Assert Clásico (XUnit) ---
+            // Assert
+
+            // --- Clásico (XUnit) ---
             // Assert.Equal(HttpStatusCode.Unauthorized, refreshResponse.StatusCode);
 
             // --- Fluent Assertions ---
@@ -181,18 +233,27 @@ namespace TodoApi.Test.Integration
         [Fact]
         public async Task RequestWithExpiredRefreshToken_ReturnsUnauthorized()
         {
+            // Arrange
             // 1. LOGIN: Obtenemos un token válido (que expira en 7 días según tu API)
-            var loginResponse = await Client.PostAsJsonAsync("/login", new { Username = "admin", Password = "12345" });
-            var rawCookie = loginResponse.Headers.GetValues("Set-Cookie").FirstOrDefault(c => c.Contains("X-Refresh-Token"));
-            var originalToken = ExtractCookieValue(rawCookie, "X-Refresh-Token");
+            var loginDto = new LoginRequestDTO
+            {
+                Username = "admin",
+                Password = "12345"
+            };
+
+            var loginResponse = await Client.PostAsJsonAsync("/login", loginDto);
+
+            var setCookieHeader = loginResponse.Headers.GetValues("Set-Cookie").FirstOrDefault(c => c.Contains("X-Refresh-Token"));
+            var originalToken = ExtractCookieValue(setCookieHeader, "X-Refresh-Token");
 
             // 2. EXPIRAR el token manualmente en la DB
             await ExecuteInScopeAsync(async (db) =>
             {
                 var tokenRecord = await db.RefreshTokens.FirstOrDefaultAsync(t => t.Token == originalToken);
+                // Precondición del Arrange
                 tokenRecord.Should().NotBeNull("el login debe haber persistido el token para poder expirarlo");
 
-                // Ponemos una fecha de expiración de hace una hora
+                // Pongo una fecha de expiración de hace una hora
                 tokenRecord.ExpiryDate = DateTime.UtcNow.AddHours(-1);
                 await db.SaveChangesAsync();
             });
@@ -200,12 +261,14 @@ namespace TodoApi.Test.Integration
             // 3. ACT: Intentar usar ese token caducado
             var refreshResponse = await Client.PostAsync("/refresh", null);
 
-            // --- Assert Clásico (XUnit) ---
+            // Assert
+
+            // --- Clásico (XUnit) ---
             // Assert.Equal(HttpStatusCode.Unauthorized, refreshResponse.StatusCode);
 
             // --- Fluent Assertions ---
             refreshResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized,
-                "porque el sistema debe rechazar tokens cuya fecha de expiración ya ha pasado");
+                "porque el sistema debe rechazar Refresh Tokens caducados");
         }
 
         // --- Helpers ---

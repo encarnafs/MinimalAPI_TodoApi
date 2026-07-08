@@ -30,7 +30,7 @@ namespace TodoApi.Middlewares
 
             httpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
 
-            // Si es desarrollo, devulevo los detalles del error por seguridad.
+            // Si es desarrollo, devuelvo los detalles del error por seguridad.
             // Si es producción, devuelvo un mensaje genérico para no dar pistas a un atacante.
             var problemDetails = new ProblemDetails
             {
