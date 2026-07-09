@@ -1,11 +1,12 @@
-﻿using Microsoft.AspNetCore.Mvc.Testing;
+﻿using FluentAssertions;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Http.Json;
 using TodoApi.Data;
+using TodoApi.DTOs;
 using TodoApi.Models;
-using FluentAssertions;
 
 namespace TodoApi.Test.Integration
 {
@@ -19,7 +20,7 @@ namespace TodoApi.Test.Integration
             await AuthenticateAsync();
             await ExecuteInScopeAsync(async (db) =>
             {
-                // Limpiamos y añadimos uno de prueba
+                // Limpio y añado uno de prueba
                 db.Todos.RemoveRange(db.Todos);
                 db.Todos.Add(new Todo { Name = "Tarea de Test", IsComplete = false });
                 await db.SaveChangesAsync();
@@ -36,16 +37,18 @@ namespace TodoApi.Test.Integration
             // Assert.NotEmpty(items);
 
             // --- Fluent Assertions ---
-            response.StatusCode.Should().Be(HttpStatusCode.OK, "porque el usuario está autenticado");
+            response.StatusCode.Should().Be(HttpStatusCode.OK, "porque el usuario autenticado tiene permiso para consultar sus tareas");
 
-            var items = await response.Content.ReadFromJsonAsync<List<Todo>>();
+            var items = await response.Content.ReadFromJsonAsync<List<TodoItemDTO>>();
 
             items.Should().NotBeNull("la API siempre debe devolver una lista, aunque esté vacía");
-            items.Should().NotBeEmpty("hemos insertado una tarea previamente en la base de datos");
+            items.Should().NotBeEmpty("he insertado una tarea previamente en la base de datos");
 
             // Un paso más allá: verificar el contenido
-            items.Should().ContainSingle(t => t.Name == "Tarea de Test",
-                "debe retornar exactamente la tarea que insertamos");
+            items.Should().ContainSingle(t =>
+                t.Name == "Tarea de Test" &&
+                t.IsComplete == false,
+                "porque debe devolver exactamente la tarea que inserté");
         }
 
         [Fact]
@@ -53,7 +56,12 @@ namespace TodoApi.Test.Integration
         {
             // 1. Arrange
             await AuthenticateAsync();
-            var nuevoTodo = new { Name = "Aprender Integration Testing", IsComplete = false };
+
+            var nuevoTodo = new TodoItemDTO
+            {
+                Name = "Aprender Integration Testing",
+                IsComplete = false
+            };
 
             // 2. Act
             var response = await Client.PostAsJsonAsync("/todoitems", nuevoTodo);
@@ -69,24 +77,24 @@ namespace TodoApi.Test.Integration
             response.StatusCode.Should().Be(HttpStatusCode.Created,
                 "porque el recurso se ha creado correctamente en el servidor");
 
-            var creado = await response.Content.ReadFromJsonAsync<Todo>();
+            var creado = await response.Content.ReadFromJsonAsync<TodoItemDTO>();
 
-            creado.Should().NotBeNull("el cuerpo de la respuesta debe contener el objeto creado");
+            creado.Should().NotBeNull("porque el endpoint devuelve el recurso recién creado");
 
-            // Verificamos que el objeto retornado coincida con lo que enviamos
-            creado.Name.Should().Be(nuevoTodo.Name,
-                "el nombre del Todo guardado debe ser idéntico al enviado");
-
-            // Tip Pro: Comparar múltiples propiedades a la vez
+            // Comparar múltiples propiedades a la vez
             creado.Should().BeEquivalentTo(nuevoTodo, options => options.ExcludingMissingMembers(),
-                "todas las propiedades enviadas deben coincidir en el objeto creado");
+                "porque el recurso devuelto debe reflejar los datos enviados por el cliente");
         }
 
         [Fact]
         public async Task CreateTodo_WhenNotAuthenticated_ReturnsUnauthorized()
         {
-            // 1. Arrange: NO llamamos a AuthenticateAsync para simular un usuario anónimo
-            var nuevoTodo = new { Name = "Tarea Anónima", IsComplete = false };
+            // 1. Arrange: NO llamo a AuthenticateAsync para simular un usuario anónimo
+            var nuevoTodo = new TodoItemDTO
+            {
+                Name = "Tarea Anónima",
+                IsComplete = false
+            };
 
             // 2. Act
             var response = await Client.PostAsJsonAsync("/todoitems", nuevoTodo);
@@ -95,10 +103,17 @@ namespace TodoApi.Test.Integration
             // --- Assert Clásico (XUnit) ---
             // Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
 
-                    // --- Fluent Assertions ---
-                    // Verificamos que el servidor rechace la petición antes de procesar el body
+            // --- Fluent Assertions ---
+            // Verifico que el servidor rechace la petición antes de procesar el body
             response.StatusCode.Should().Be(HttpStatusCode.Unauthorized,
-                "porque el endpoint /todoitems requiere autenticación previa para crear recursos");
+                "porque solo los usuarios autenticados pueden crear tareas");
+
+            // Verificación de que no se haya creado ningún registro en la base de datos
+            await ExecuteInScopeAsync(async db =>
+            {
+                (await db.Todos.CountAsync()).Should().Be(0,
+                    "porque una petición no autenticada no debe crear registros");
+            });
         }
 
         [Fact]
@@ -125,9 +140,9 @@ namespace TodoApi.Test.Integration
 
             // --- Fluent Assertions ---
             response.StatusCode.Should().Be(HttpStatusCode.NoContent,
-                "porque el estándar REST para borrado exitoso sin cuerpo es 204 NoContent");
+                "porque una eliminación correcta devuelve 204 No Content según las convenciones REST");
 
-            // Verificar que ya no existe en la DB (Verificación de persistencia)
+            // Verifico que el recurso ya no existe en la base de datos.
             await ExecuteInScopeAsync(async (db) =>
             {
                 var existe = await db.Todos.AnyAsync(t => t.Id == todoId);
@@ -136,54 +151,36 @@ namespace TodoApi.Test.Integration
                 // Assert.False(existe);
 
                 // Fluent Assertions
-                existe.Should().BeFalse("el registro debe haber sido eliminado físicamente de la base de datos");
+                existe.Should().BeFalse("porque el registro debe haber sido eliminado físicamente de la base de datos");
             });
         }
 
 
         [Fact]
-        public async Task DeleteTodo_WhenAuthenticated_ReturnsOK()
+        public async Task DeleteTodo_WhenTodoDoesNotExist_ReturnsNotFound()
         {
-            // 1. Arrange: Crear un recurso para borrarlo después
+            // Arrange
             await AuthenticateAsync();
-            int todoId = 0;
 
-            await ExecuteInScopeAsync(async (db) =>
-            {
-                var todo = new Todo { Name = "Para borrar", IsComplete = false };
-                db.Todos.Add(todo);
-                await db.SaveChangesAsync();
-                todoId = todo.Id; // Guardamos el ID generado
-            });
+            const int nonExistingId = 999999;
 
-            // 2. Act
-            var response = await Client.DeleteAsync($"/todoitems/{todoId}");
+            // Act
+            var response = await Client.DeleteAsync($"/todoitems/{nonExistingId}");
 
-            // 3. Assert
+            // Assert
+
             // --- Assert Clásico (XUnit) ---
-            // Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            // Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
 
             // --- Fluent Assertions ---
-            response.StatusCode.Should().Be(HttpStatusCode.NoContent,
-                "porque el método DeleteTodo de la API devuelve TypedResults.NoContent()");
-
-            // Verificación final en Base de Datos
-            await ExecuteInScopeAsync(async (db) =>
-            {
-                var existe = await db.Todos.AnyAsync(t => t.Id == todoId);
-
-                // --- Assert Clásico (XUnit) ---
-                // Assert.False(existe);
-
-                // Fluent Assertions
-                existe.Should().BeFalse("el registro debe haber sido eliminado de la base de datos");
-            });
+            response.StatusCode.Should().Be(HttpStatusCode.NotFound,
+                "porque no es posible eliminar un recurso que no existe");
         }
 
         [Fact]
         public async Task GetTodos_FilterCompleted_ReturnsOnlyCompletedItems()
         {
-            // 1. Arrange: Insertamos datos mezclados
+            // 1. Arrange: Inserto datos mezclados
             await AuthenticateAsync();
 
             await ExecuteInScopeAsync(async (db) =>
@@ -196,31 +193,35 @@ namespace TodoApi.Test.Integration
                 await db.SaveChangesAsync();
             });
 
-            // 2. Act: Llamamos al endpoint con el parámetro de filtro
+            // 2. Act: LLamo al endpoint con el parámetro de filtro
             var response = await Client.GetAsync("/todoitems/complete");
 
             // 3. Assert
             response.StatusCode.Should().Be(HttpStatusCode.OK,
-                "porque el endpoint de tareas completadas debe estar accesible");
+                "porque un usuario autenticado puede consultar las tareas completadas");
 
-            var items = await response.Content.ReadFromJsonAsync<List<Todo>>();
+            var items = await response.Content.ReadFromJsonAsync<List<TodoItemDTO>>();
 
             // Verificaciones potentes con Fluent Assertions
-            items.Should().NotBeNull();
+            items.Should().NotBeNull(
+                "porque el endpoint siempre debe devolver una colección");
 
-            // Verificamos que la lista NO contenga la tarea pendiente
-            items.Should().NotContain(t => t.IsComplete == false,
-                "el endpoint /complete nunca debe devolver tareas pendientes");
+            // Verifico que la lista NO contenga la tarea pendiente
+            items.Should().NotContain(t => !t.IsComplete,
+                "porque el endpoint /complete nunca debe devolver tareas pendientes");
 
-            // Verificamos que al menos contenga la que marcamos como true
-            items.Should().ContainSingle(t => t.Name == "Tarea Completa",
-                "debe retornar la tarea que insertamos como completada");
+            // Verifico que al menos contenga la que marco como true
+            items.Should().ContainSingle(t =>
+                t.Name == "Tarea Completa" &&
+                t.IsComplete,
+                "porque debe devolver únicamente la tarea completada que insertamos");
         }
 
+        
         [Fact]
         public async Task GetTodoById_WhenItemExists_ReturnsOk_WithItem()
         {
-            // 1. Arrange: Insertamos un elemento específico
+            // 1. Arrange: Inserto un elemento específico
             await AuthenticateAsync();
             int todoId = 0;
             var nombreEsperado = "Tarea para buscar por ID";
@@ -233,7 +234,7 @@ namespace TodoApi.Test.Integration
                 todoId = todo.Id; // Capturamos el ID generado por la DB
             });
 
-            // 2. Act: Consultamos el endpoint con el ID real
+            // 2. Act: Consulto el endpoint con el ID real
             var response = await Client.GetAsync($"/todoitems/{todoId}");
 
             // 3. Assert
@@ -245,24 +246,28 @@ namespace TodoApi.Test.Integration
 
             // --- Fluent Assertions ---
             response.StatusCode.Should().Be(HttpStatusCode.OK,
-                "porque el ID solicitado existe en la base de datos");
+                "porque el recurso solicitado existe");
 
-            var item = await response.Content.ReadFromJsonAsync<Todo>();
+            var item = await response.Content.ReadFromJsonAsync<TodoItemDTO>();
 
-            item.Should().NotBeNull("el cuerpo de la respuesta debe contener el objeto Todo solicitado");
+            item.Should().NotBeNull("porque el recurso solicitado existe");
 
-            // Verificamos que los datos coincidan
-            item.Id.Should().Be(todoId);
+            // Verifico que los datos coincidan
+            item.Id.Should().Be(todoId, "porque debe devolver el recurso solicitado");
             item.Name.Should().Be(nombreEsperado,
-                "el nombre devuelto debe coincidir con el que guardamos en la DB");
+                "porque debe devolver los datos del recurso almacenado");
         }
 
         [Fact]
         public async Task UpdateTodo_WhenAuthenticated_ReturnsNoContent()
         {
-            // 1. Arrange: Creamos el recurso original
+            // 1. Arrange: Creo el recurso original
             await AuthenticateAsync();
-            var todo = new Todo { Name = "Original", IsComplete = false };
+            var todo = new Todo 
+            { 
+                Name = "Original", 
+                IsComplete = false
+            };
 
             await ExecuteInScopeAsync(async (db) =>
             {
@@ -270,12 +275,16 @@ namespace TodoApi.Test.Integration
                 await db.SaveChangesAsync();
             });
 
-            // Modificamos el objeto directamente para enviarlo como "nuevo estado"
-            todo.Name = "Modificado";
-            todo.IsComplete = true;
+            // Preparo el nuevo estado que enviaré al endpoint
+            var todoActualizado = new TodoItemDTO
+            {
+                //Id = todo.Id, El identificador viaja en la URL, no en el body
+                Name = "Modificado",
+                IsComplete = true
+            };
 
-            // 2. Act: Enviamos el objeto 'todo' actualizado
-            var response = await Client.PutAsJsonAsync($"/todoitems/{todo.Id}", todo);
+            // 2. Act: Envío el DTO con los datos actualizados
+            var response = await Client.PutAsJsonAsync($"/todoitems/{todo.Id}", todoActualizado);
 
             // 3. Assert
             // --- Assert Clásico (XUnit) ---
@@ -283,18 +292,19 @@ namespace TodoApi.Test.Integration
 
             // --- Fluent Assertions ---
             response.StatusCode.Should().Be(HttpStatusCode.NoContent,
-                "porque la API debe procesar la actualización y devolver 204");
+                "porque la actualización del recurso se ha realizado correctamente");
 
             // Verificación de persistencia real
             await ExecuteInScopeAsync(async (db) =>
             {
                 var todoEnDb = await db.Todos.FindAsync(todo.Id);
 
-                todoEnDb.Should().NotBeNull();
-                todoEnDb.Name.Should().Be("Modificado", "el cambio de nombre debe persistir en la DB");
-                todoEnDb.IsComplete.Should().BeTrue("el estado debe haber cambiado a completado");
+                todoEnDb.Should().NotBeNull("porque el recurso ya existía antes de la actualización");
+                todoEnDb.Name.Should().Be("Modificado", "porque el nuevo nombre debe persistirse en la base de datos");
+                todoEnDb.IsComplete.Should().BeTrue("porque la actualización debe persistir el nuevo estado");
             });
         }
+
 
         // --- Helpers ---
 
